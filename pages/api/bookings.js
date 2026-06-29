@@ -1,43 +1,68 @@
-// In production, this would write to a database (PostgreSQL/MongoDB)
-// For now, we store in memory (resets on server restart)
+import { prisma } from "../../lib/prisma";
 
-let bookings = [];
-let nextId = 1;
-
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === "POST") {
-    const { doctorId, doctorName, patientName, patientPhone, date, time, specialty } = req.body;
+  const {
+  userId,
+  doctorId,
+  patientName,
+  patientPhone,
+  date,
+  time,
+  paymentId,
+  paymentStatus,
+  amountPaid,
+} = req.body;
 
-    if (!doctorId || !patientName || !patientPhone || !date || !time) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const booking = {
-      id: nextId++,
-      doctorId,
-      doctorName,
-      patientName,
-      patientPhone,
-      date,
-      time,
-      specialty,
-      status: "confirmed",
-      createdAt: new Date().toISOString(),
-      bookingRef: `PRC${Date.now()}`,
-    };
-
-    bookings.push(booking);
-    return res.status(201).json({ success: true, booking });
+  if (!doctorId || !patientName || !patientPhone || !date || !time) {
+    return res.status(400).json({
+      error: "Missing required fields",
+    });
   }
+
+  const appointment = await prisma.appointment.create({
+  data: {
+    userId,
+    doctorId: parseInt(doctorId),
+    patientName,
+    patientPhone,
+    time,
+    date: new Date(date),
+
+    paymentId,
+    paymentStatus,
+    amountPaid,
+
+    status: "confirmed",
+  },
+});
+
+await prisma.doctorSlot.updateMany({
+  where: {
+    doctorId: parseInt(doctorId),
+    date: new Date(date),
+    time,
+  },
+  data: {
+    available: false,
+  },
+});
+
+return res.status(201).json({
+  success: true,
+  appointment,
+});
+}
 
   if (req.method === "GET") {
-    const { phone } = req.query;
-    if (phone) {
-      const userBookings = bookings.filter((b) => b.patientPhone === phone);
-      return res.status(200).json({ bookings: userBookings });
-    }
-    return res.status(200).json({ bookings });
+    const appointments = await prisma.appointment.findMany();
+
+    return res.status(200).json({
+      appointments,
+    });
   }
 
-  res.status(405).json({ error: "Method not allowed" });
+  return res.status(405).json({
+    error: "Method not allowed",
+  });
 }

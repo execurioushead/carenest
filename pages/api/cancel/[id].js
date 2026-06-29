@@ -3,13 +3,16 @@ import { prisma } from "../../../lib/prisma";
 export default async function handler(req, res) {
   const { id } = req.query;
 
-  const doctor = await prisma.doctor.findUnique({
+  await prisma.appointment.update({
     where: {
-      id: Number(id)
-    }
+      id: Number(id),
+    },
+    data: {
+      status: "cancelled",
+    },
   });
 
   res.status(200).json({
-    doctor
+    success: true,
   });
 }

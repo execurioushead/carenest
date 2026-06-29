@@ -1,9 +1,10 @@
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import Link from "next/link";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-
+  const { data: session } = useSession();
   return (
     <nav style={{
       background: "#fff",
@@ -29,35 +30,156 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <div style={{ display: "flex", alignItems: "center", gap: 28 }}
-          className="desktop-nav">
-          <Link href="/doctors">
-            <span style={{ fontSize: 14, fontWeight: 500, color: "#374151", cursor: "pointer" }}
-              className="nav-link">Find Doctors</span>
-          </Link>
-          <Link href="/video-consult">
-            <span style={{ fontSize: 14, fontWeight: 500, color: "#374151", cursor: "pointer" }}
-              className="nav-link">Video Consult</span>
-          </Link>
-          <Link href="/tests">
-            <span style={{ fontSize: 14, fontWeight: 500, color: "#374151", cursor: "pointer" }}
-              className="nav-link">Lab Tests</span>
-          </Link>
-          <Link href="/articles">
-            <span style={{ fontSize: 14, fontWeight: 500, color: "#374151", cursor: "pointer" }}
-              className="nav-link">Health Articles</span>
-          </Link>
-        </div>
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 28,
+  }}
+  className="desktop-nav"
+>
+  <Link href="/doctors">
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151",
+        cursor: "pointer",
+      }}
+      className="nav-link"
+    >
+      Find Doctors
+    </span>
+  </Link>
 
-        {/* CTA */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <Link href="/login">
-            <button className="btn-outline" style={{ padding: "8px 20px", fontSize: 14 }}>Login</button>
-          </Link>
-          <Link href="/signup">
-            <button className="btn-primary" style={{ padding: "8px 20px", fontSize: 14 }}>Sign Up</button>
-          </Link>
-        </div>
+  <Link href="/video-consult">
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151",
+        cursor: "pointer",
+      }}
+      className="nav-link"
+    >
+      Video Consult
+    </span>
+  </Link>
+
+  <Link href="/tests">
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151",
+        cursor: "pointer",
+      }}
+      className="nav-link"
+    >
+      Lab Tests
+    </span>
+  </Link>
+
+  <Link href="/articles">
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151",
+        cursor: "pointer",
+      }}
+      className="nav-link"
+    >
+      Health Articles
+    </span>
+  </Link>
+
+  {session && (
+    <Link href="/appointments">
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: "#374151",
+          cursor: "pointer",
+        }}
+        className="nav-link"
+      >
+        My Appointments
+      </span>
+    </Link>
+  )}
+
+  {session?.user?.role === "doctor" && (
+    <Link href="/doctor/dashboard">
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: "#374151",
+          cursor: "pointer",
+        }}
+        className="nav-link"
+      >
+        Doctor Dashboard
+      </span>
+    </Link>
+  )}
+</div>
+
+        {/* Authentication */}
+<div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+  {session ? (
+    <>
+      {session.user?.image && (
+        <img
+          src={session.user.image}
+          alt="Profile"
+          width={36}
+          height={36}
+          style={{
+            borderRadius: "50%",
+            objectFit: "cover"
+          }}
+        />
+      )}
+
+      <span style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151"
+      }}>
+        Hi, {session.user?.name?.split(" ")[0]}
+      </span>
+
+      <button
+        className="btn-outline"
+        onClick={() => signOut()}
+        style={{ padding: "8px 20px", fontSize: 14 }}
+      >
+        Logout
+      </button>
+    </>
+  ) : (
+    <>
+      <button
+        className="btn-outline"
+        onClick={() => signIn("google")}
+        style={{ padding: "8px 20px", fontSize: 14 }}
+      >
+        Login
+      </button>
+
+      <button
+        className="btn-primary"
+        onClick={() => signIn("google")}
+        style={{ padding: "8px 20px", fontSize: 14 }}
+      >
+        Sign Up
+      </button>
+    </>
+  )}
+</div>
       </div>
 
       <style jsx>{`

@@ -1,17 +1,37 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
-const timeSlots = ["9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM"];
 
+
+
+
+const timeSlots = [
+  "9:00 AM",
+  "9:30 AM",
+  "10:00 AM",
+  "10:30 AM",
+  "11:00 AM",
+  "11:30 AM",
+  "2:00 PM",
+  "2:30 PM",
+  "3:00 PM",
+  "3:30 PM",
+  "4:00 PM",
+  "4:30 PM",
+];
 export default function BookAppointment() {
   const router = useRouter();
   const { id } = router.query;
+  const { data: session } = useSession();
+  console.log(session);
 
   const [doctor, setDoctor] = useState(null);
   const [form, setForm] = useState({ patientName: "", patientPhone: "", date: "", time: "" });
+  
   const [submitted, setSubmitted] = useState(false);
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,30 +41,143 @@ export default function BookAppointment() {
     if (!id) return;
     fetch(`/api/doctors/${id}`).then(r => r.json()).then(d => setDoctor(d.doctor));
   }, [id]);
+  
+
+
 
   const today = new Date().toISOString().split("T")[0];
+  const loadRazorpayScript = () => {
+return new Promise((resolve) => {
+const script = document.createElement("script");
+
+
+script.src = "https://checkout.razorpay.com/v1/checkout.js";
+
+script.onload = () => resolve(true);
+
+script.onerror = () => resolve(false);
+
+document.body.appendChild(script);
+
+
+});
+};
+
 
   const handleSubmit = async () => {
-    setError("");
-    if (!form.patientName || !form.patientPhone || !form.date || !form.time) {
-      setError("Please fill in all fields.");
-      return;
-    }
-    if (!/^\d{10}$/.test(form.patientPhone)) {
-      setError("Enter a valid 10-digit phone number.");
-      return;
-    }
-    setLoading(true);
+setError("");
+
+if (!session) {
+  setError("Please login before booking an appointment.");
+  return;
+}
+
+if (!form.patientName || !form.patientPhone || !form.date || !form.time) {
+setError("Please fill in all fields.");
+return;
+}
+
+if (!/^\d{10}$/.test(form.patientPhone)) {
+setError("Enter a valid 10-digit phone number.");
+return;
+}
+
+setLoading(true);
+const loaded = await loadRazorpayScript();
+
+if (!loaded) {
+setError("Failed to load Razorpay.");
+setLoading(false);
+return;
+}
+
+
+try {
+// Create Razorpay Order
+const orderRes = await fetch("/api/create-order", {
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+},
+body: JSON.stringify({
+amount: doctor.fee,
+}),
+});
+
+
+const order = await orderRes.json();
+console.log(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
+const options = {
+  key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+  amount: order.amount,
+  currency: order.currency,
+  name: "CareNest",
+  description: "Doctor Consultation",
+  order_id: order.id,
+
+  prefill: {
+    name: form.patientName,
+    contact: form.patientPhone,
+  },
+
+  theme: {
+    color: "#2d6be4",
+  },
+
+  handler: async function (response) {
+    // Payment successful -> create appointment
     const res = await fetch("/api/bookings", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ doctorId: doctor.id, doctorName: doctor.name, specialty: doctor.specialty, ...form }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+  
+  userId: session.user.id,
+  doctorId: doctor.id,
+  doctorName: doctor.name,
+  specialty: doctor.specialty,
+  patientName: form.patientName,
+  patientPhone: form.patientPhone,
+  date: form.date,
+  time: form.time,
+
+  paymentId: response.razorpay_payment_id,
+  paymentStatus: "paid",
+  amountPaid: doctor.fee,
+}),
     });
+
     const data = await res.json();
+
     setLoading(false);
-    if (data.success) { setBooking(data.booking); setSubmitted(true); }
-    else setError("Booking failed. Please try again.");
-  };
+
+    if (data.success) {
+      setBooking(data.appointment);
+      setSubmitted(true);
+    } else {
+      setError(data.error || "Booking failed.");
+    }
+  },
+
+  modal: {
+    ondismiss: function () {
+      setLoading(false);
+    },
+  },
+};
+
+const razor = new window.Razorpay(options);
+razor.open();
+
+
+} catch (err) {
+console.error(err);
+setLoading(false);
+setError("Unable to initialize payment.");
+}
+};
+
 
   if (submitted && booking) return (
     <>
@@ -142,23 +275,52 @@ export default function BookAppointment() {
 
               <div>
                 <label style={{ fontSize: 14, fontWeight: 600, display: "block", marginBottom: 12 }}>Select Time Slot *</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
-                  {timeSlots.map(slot => (
-                    <button
-                      key={slot}
-                      onClick={() => setForm({ ...form, time: slot })}
-                      style={{
-                        padding: "10px 8px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                        border: form.time === slot ? "2px solid #2d6be4" : "2px solid #e5e7eb",
-                        background: form.time === slot ? "#eef3fd" : "#fff",
-                        color: form.time === slot ? "#2d6be4" : "#374151",
-                        transition: "all 0.15s"
-                      }}
-                    >
-                      {slot}
-                    </button>
-                  ))}
-                </div>
+                <div
+  style={{
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fill, minmax(110px, 1fr))",
+    gap: 10,
+  }}
+>
+  {timeSlots.map(slot => (
+    <button
+      key={slot}
+      onClick={() =>
+        setForm({
+          ...form,
+          time: slot,
+        })
+      }
+      style={{
+        padding: "10px 8px",
+        borderRadius: 8,
+        fontSize: 13,
+        fontWeight: 600,
+
+        border:
+          form.time === slot
+            ? "2px solid #2d6be4"
+            : "2px solid #e5e7eb",
+
+        background:
+          form.time === slot
+            ? "#eef3fd"
+            : "#fff",
+
+        color:
+          form.time === slot
+            ? "#2d6be4"
+            : "#374151",
+
+        transition: "all 0.15s",
+      }}
+    >
+      {slot}
+    </button>
+  ))}
+</div>
+                
               </div>
 
               {error && (
@@ -173,7 +335,7 @@ export default function BookAppointment() {
                 className="btn-primary"
                 style={{ padding: "16px", fontSize: 16, opacity: loading ? 0.7 : 1 }}
               >
-                {loading ? "Booking..." : "Confirm Appointment"}
+                {loading ? "Processing..." : `Pay ₹${doctor?.fee || 0} & Confirm`}
               </button>
             </div>
           </div>
