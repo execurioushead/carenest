@@ -23,25 +23,25 @@ model User {
 }
 
 model Doctor {
-  id Int @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
+  userId         String?  @unique
 
-  userId String? @unique
+  name           String
+  specialty      String
+  experience     Int
+  fee            Int
+  location       String
 
-  name       String
-  specialty  String
-  experience Int
-  fee        Int
-  location   String
-  available  Boolean @default(true)
+  available      Boolean  @default(true)
 
   qualifications String?
   about          String?
 
-  appointments Appointment[]
+  appointments   Appointment[]
 
-  user User? @relation(fields: [userId], references: [id])
-  availableSlots Json?
-  
+  slots          DoctorSlot[]
+
+  user           User? @relation(fields: [userId], references: [id])
 }
 
 model Appointment {
